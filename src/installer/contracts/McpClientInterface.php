@@ -54,7 +54,8 @@ interface McpClientInterface {
      *
      * @param string $environment The environment type ('ddev' or 'native')
      * @param string|null $projectPath Absolute project path (required if requiresAbsolutePaths() is true)
+     * @param string|null $craftSubdirectory Relative path from project root to Craft root (e.g. 'backend')
      * @return array{command: string, args: string[], cwd?: string}
      */
-    public function generateServerConfig(string $environment, ?string $projectPath = null): array;
+    public function generateServerConfig(string $environment, ?string $projectPath = null, ?string $craftSubdirectory = null): array;
 }

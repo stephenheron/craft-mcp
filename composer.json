@@ -29,7 +29,7 @@
     "require": {
         "php": "^8.3",
         "craftcms/cms": "^5.0",
-        "mcp/sdk": "^0.2"
+        "mcp/sdk": "^0.3"
     },
     "require-dev": {
         "laravel/pint": "^1.18",
@@ -61,7 +61,8 @@
         "allow-plugins": {
             "craftcms/plugin-installer": true,
             "yiisoft/yii2-composer": true,
-            "pestphp/pest-plugin": true
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
         }
     },
     "scripts": {

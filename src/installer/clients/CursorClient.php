@@ -23,6 +23,6 @@ final class CursorClient extends AbstractMcpClient {
     }
 
     public function getConfigPath(): string {
-        return $this->projectRoot . '/.cursor/mcp.json';
+        return $this->configRoot . '/.cursor/mcp.json';
     }
 }

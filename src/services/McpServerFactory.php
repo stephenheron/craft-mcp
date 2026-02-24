@@ -67,8 +67,7 @@ class McpServerFactory {
      */
     public static function createFileLogger(?string $logPath = null): LoggerInterface {
         if ($logPath === null) {
-            $resolved = Craft::getAlias('@storage/logs/mcp-server.log');
-            $logPath = $resolved !== false ? $resolved : '/tmp/mcp-server.log';
+            $logPath = Craft::getAlias('@storage/logs/mcp-server.log');
         }
 
         return new FileLogger($logPath);

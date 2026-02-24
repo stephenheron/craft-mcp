@@ -23,6 +23,6 @@ final class ClaudeCodeClient extends AbstractMcpClient {
     }
 
     public function getConfigPath(): string {
-        return $this->projectRoot . '/.mcp.json';
+        return $this->configRoot . '/.mcp.json';
     }
 }

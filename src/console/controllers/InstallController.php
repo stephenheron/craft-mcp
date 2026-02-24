@@ -16,6 +16,7 @@ use stimmt\craft\Mcp\installer\clients\CursorClient;
 use stimmt\craft\Mcp\installer\ConfigWriter;
 use stimmt\craft\Mcp\installer\contracts\McpClientInterface;
 use stimmt\craft\Mcp\installer\EnvironmentDetector;
+use stimmt\craft\Mcp\installer\ProjectRootResolver;
 use stimmt\craft\Mcp\installer\WriteResult;
 use yii\console\ExitCode;
 
@@ -73,8 +74,8 @@ class InstallController extends Controller {
      * @return int Exit code
      */
     public function actionIndex(): int {
-        $projectRoot = Craft::getAlias('@root');
-        $envDetector = new EnvironmentDetector($projectRoot);
+        $craftRoot = Craft::getAlias('@root');
+        $envDetector = new EnvironmentDetector($craftRoot);
         $configWriter = new ConfigWriter();
 
         $this->printHeader();
@@ -82,8 +83,11 @@ class InstallController extends Controller {
         // 1. Resolve environment
         $environment = $this->resolveEnvironment($envDetector);
 
-        // 2. Select clients to configure
-        $clients = $this->selectClients($projectRoot, $envDetector);
+        // 2. Resolve project root (monorepo detection)
+        [$configRoot, $craftSubdirectory] = $this->resolveConfigRoot($craftRoot);
+
+        // 3. Select clients to configure
+        $clients = $this->selectClients($craftRoot, $configRoot, $envDetector);
 
         if ($clients === []) {
             $this->stdout(PHP_EOL . 'No clients selected. Nothing to do.' . PHP_EOL, Console::FG_YELLOW);
@@ -91,17 +95,17 @@ class InstallController extends Controller {
             return ExitCode::OK;
         }
 
-        // 3. Get project path if any client needs absolute paths
-        $projectPath = $this->resolveProjectPath($clients, $projectRoot);
+        // 4. Get project path if any client needs absolute paths
+        $projectPath = $this->resolveProjectPath($clients, $configRoot);
 
-        // 4. Get server name
+        // 5. Get server name
         $serverName = $this->resolveServerName($configWriter, $clients);
 
-        // 5. Generate and write configurations
+        // 6. Generate and write configurations
         $this->stdout(PHP_EOL . 'Generating configuration files...' . PHP_EOL . PHP_EOL);
 
         foreach ($clients as $client) {
-            $this->writeClientConfig($client, $environment, $projectPath, $serverName, $configWriter);
+            $this->writeClientConfig($client, $environment, $projectPath, $craftSubdirectory, $serverName, $configWriter);
         }
 
         $this->printSuccessMessage();
@@ -147,12 +151,49 @@ class InstallController extends Controller {
     }
 
     /**
+     * Resolve the config root directory (where .mcp.json etc. should be written).
+     *
+     * Detects monorepo layouts where Craft lives in a subdirectory (e.g. backend/).
+     * Auto-detects by walking up from Craft root looking for .ddev/.git markers.
+     *
+     * @return array{0: string, 1: string|null} [configRoot, craftSubdirectory]
+     */
+    private function resolveConfigRoot(string $craftRoot): array {
+        $resolver = new ProjectRootResolver($craftRoot);
+        $detected = $resolver->resolve();
+        $subdirectory = $resolver->getSubdirectory($detected);
+
+        $this->stdout(PHP_EOL);
+
+        $default = $subdirectory ?? '';
+        $label = $default !== '' ? "Craft subdirectory ({$default}):" : 'Craft subdirectory:';
+
+        $this->stdout($label . ' ');
+        $input = trim(fgets(STDIN));
+
+        if ($input === '') {
+            $input = $default;
+        }
+
+        $input = trim($input, '/ ');
+
+        if ($input === '') {
+            return [$craftRoot, null];
+        }
+
+        $levels = count(explode('/', $input));
+        $configRoot = dirname($craftRoot, $levels);
+
+        return [$configRoot, $input];
+    }
+
+    /**
      * Let user select which clients to configure.
      *
      * @return McpClientInterface[]
      */
-    private function selectClients(string $projectRoot, EnvironmentDetector $envDetector): array {
-        $available = $this->getAvailableClients($projectRoot, $envDetector);
+    private function selectClients(string $craftRoot, string $configRoot, EnvironmentDetector $envDetector): array {
+        $available = $this->getAvailableClients($craftRoot, $configRoot, $envDetector);
 
         $this->stdout(PHP_EOL . 'Which MCP clients would you like to configure?' . PHP_EOL);
         $this->stdout('(You can configure multiple clients)' . PHP_EOL . PHP_EOL);
@@ -176,11 +217,11 @@ class InstallController extends Controller {
      *
      * @return McpClientInterface[]
      */
-    private function getAvailableClients(string $projectRoot, EnvironmentDetector $envDetector): array {
+    private function getAvailableClients(string $craftRoot, string $configRoot, EnvironmentDetector $envDetector): array {
         return [
-            new ClaudeCodeClient($projectRoot, $envDetector),
-            new CursorClient($projectRoot, $envDetector),
-            new ClaudeDesktopClient($projectRoot, $envDetector),
+            new ClaudeCodeClient($craftRoot, $configRoot, $envDetector),
+            new CursorClient($craftRoot, $configRoot, $envDetector),
+            new ClaudeDesktopClient($craftRoot, $configRoot, $envDetector),
         ];
     }
 
@@ -270,10 +311,11 @@ class InstallController extends Controller {
         McpClientInterface $client,
         string $environment,
         ?string $projectPath,
+        ?string $craftSubdirectory,
         string $serverName,
         ConfigWriter $configWriter,
     ): void {
-        $config = $client->generateServerConfig($environment, $projectPath);
+        $config = $client->generateServerConfig($environment, $projectPath, $craftSubdirectory);
 
         try {
             $result = $configWriter->write($client->getConfigPath(), $serverName, $config);
