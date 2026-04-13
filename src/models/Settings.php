@@ -28,6 +28,8 @@ class Settings extends Model {
 
     public bool $enableDangerousTools = true;
 
+    public bool $enableHttpTransport = false;
+
     /** @var string[] */
     public array $allowedIps = [];
 
@@ -37,7 +39,7 @@ class Settings extends Model {
     #[Override]
     public function defineRules(): array {
         return [
-            [['enabled', 'enableDangerousTools'], 'boolean'],
+            [['enabled', 'enableDangerousTools', 'enableHttpTransport'], 'boolean'],
             [['disabledTools', 'disabledPrompts', 'disabledResources', 'allowedIps'], 'each', 'rule' => ['string']],
         ];
     }

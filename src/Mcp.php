@@ -7,8 +7,11 @@ namespace stimmt\craft\Mcp;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
+use craft\events\RegisterUrlRulesEvent;
 use craft\services\Path;
+use craft\web\UrlManager;
 use Override;
+use yii\base\Event;
 use stimmt\craft\Mcp\events\RegisterPromptsEvent;
 use stimmt\craft\Mcp\events\RegisterResourcesEvent;
 use stimmt\craft\Mcp\events\RegisterToolsEvent;
@@ -83,6 +86,10 @@ class Mcp extends BasePlugin {
     #[Override]
     public function init(): void {
         parent::init();
+
+        if (Craft::$app->getRequest()->getIsSiteRequest()) {
+            $this->registerHttpTransportRoutes();
+        }
 
         Craft::info('Craft MCP plugin loaded', __METHOD__);
     }
@@ -214,6 +221,19 @@ class Mcp extends BasePlugin {
         }
 
         return $settings;
+    }
+
+    /**
+     * Register site URL rules for the Streamable HTTP transport endpoint.
+     */
+    private function registerHttpTransportRoutes(): void {
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+            function (RegisterUrlRulesEvent $event): void {
+                $event->rules['mcp'] = 'mcp/mcp/index';
+            },
+        );
     }
 
     /**

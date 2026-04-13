@@ -7,6 +7,8 @@ namespace stimmt\craft\Mcp\services;
 use Craft;
 use Mcp\Server;
 use Mcp\Server\Builder;
+use Mcp\Server\Session\Psr16SessionStore;
+use Mcp\Server\Session\SessionStoreInterface;
 use Mcp\Server\Transport\StdioTransport;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
@@ -24,7 +26,11 @@ use stimmt\craft\Mcp\support\Psr11ContainerAdapter;
  * @author Max van Essen <support@stimmt.digital>
  */
 class McpServerFactory {
-    public function __construct(private readonly ?ContainerInterface $container = new Psr11ContainerAdapter(), private readonly ?LoggerInterface $logger = null) {
+    public function __construct(
+        private readonly ?ContainerInterface $container = new Psr11ContainerAdapter(),
+        private readonly ?LoggerInterface $logger = null,
+        private readonly ?SessionStoreInterface $sessionStore = null,
+    ) {
     }
 
     /**
@@ -49,9 +55,25 @@ class McpServerFactory {
             $builder->setLogger($this->logger);
         }
 
+        // Use file-based session store for HTTP transport persistence
+        if ($this->sessionStore !== null) {
+            $builder->setSession($this->sessionStore);
+        }
+
         $this->registerExternalElements($builder);
 
         return $builder->build();
+    }
+
+    /**
+     * Create a cache-backed session store for HTTP transport.
+     * Uses Craft's configured cache (Redis, Memcached, DB, etc.)
+     * so sessions persist across requests and work in multi-server setups.
+     */
+    public static function createSessionStore(): Psr16SessionStore {
+        $adapter = new \stimmt\craft\Mcp\support\CraftCacheAdapter(Craft::$app->getCache());
+
+        return new Psr16SessionStore($adapter, prefix: 'mcp-session-');
     }
 
     /**
