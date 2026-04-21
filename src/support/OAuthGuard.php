@@ -57,6 +57,12 @@ final class OAuthGuard {
             throw self::challenge('invalid_token');
         }
 
+        // v1 policy: only admins can drive MCP. Re-checked on every request
+        // so demoting a user invalidates their live tokens immediately.
+        if (!$user->admin) {
+            throw self::challenge('invalid_token');
+        }
+
         return $user;
     }
 

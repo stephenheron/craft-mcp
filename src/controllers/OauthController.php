@@ -54,6 +54,10 @@ class OauthController extends Controller {
             return $this->renderConsent($authRequest, $psrRequest, 'Invalid username or password');
         }
 
+        if (!$user->admin) {
+            return $this->renderConsent($authRequest, $psrRequest, 'MCP access is restricted to admin users.');
+        }
+
         $authRequest->setUser(new UserEntity((int) $user->id));
         $authRequest->setAuthorizationApproved(true);
 
