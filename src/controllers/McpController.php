@@ -11,6 +11,8 @@ use Mcp\Server\Transport\StreamableHttpTransport;
 use Psr\Http\Message\ResponseInterface;
 use stimmt\craft\Mcp\Mcp;
 use stimmt\craft\Mcp\services\McpServerFactory;
+use stimmt\craft\Mcp\support\OAuthGuard;
+use stimmt\craft\Mcp\support\OAuthGuardException;
 
 /**
  * Handles MCP requests over Streamable HTTP transport.
@@ -53,6 +55,17 @@ class McpController extends Controller {
                 $this->sendJsonError('Forbidden', 403);
                 return;
             }
+        }
+
+        // OAuth bearer-token guard. No-op when settings->oauthEnabled is false.
+        try {
+            $user = OAuthGuard::authorize();
+            if ($user !== null) {
+                Craft::$app->getUser()->setIdentity($user);
+            }
+        } catch (OAuthGuardException $e) {
+            $this->emitPsrResponse($e->toPsrResponse());
+            return;
         }
 
         // Build PSR-7 request from PHP globals

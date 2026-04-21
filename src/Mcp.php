@@ -7,9 +7,11 @@ namespace stimmt\craft\Mcp;
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
+use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\services\Path;
 use craft\web\UrlManager;
+use craft\web\View;
 use Override;
 use yii\base\Event;
 use stimmt\craft\Mcp\events\RegisterPromptsEvent;
@@ -61,7 +63,7 @@ class Mcp extends BasePlugin {
         'execute_graphql',
     ];
 
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.1.0';
 
     public bool $hasCpSettings = false;
 
@@ -89,6 +91,7 @@ class Mcp extends BasePlugin {
 
         if (Craft::$app->getRequest()->getIsSiteRequest()) {
             $this->registerHttpTransportRoutes();
+            $this->registerOAuthTemplateRoot();
         }
 
         Craft::info('Craft MCP plugin loaded', __METHOD__);
@@ -224,14 +227,34 @@ class Mcp extends BasePlugin {
     }
 
     /**
-     * Register site URL rules for the Streamable HTTP transport endpoint.
+     * Register site URL rules for the Streamable HTTP transport and OAuth endpoints.
      */
     private function registerHttpTransportRoutes(): void {
         Event::on(
             UrlManager::class,
             UrlManager::EVENT_REGISTER_SITE_URL_RULES,
             function (RegisterUrlRulesEvent $event): void {
+                $event->rules['.well-known/oauth-protected-resource'] = 'mcp/oauth-metadata/protected-resource';
+                $event->rules['.well-known/oauth-authorization-server'] = 'mcp/oauth-metadata/authorization-server';
+                $event->rules['mcp/oauth/authorize'] = 'mcp/oauth/authorize';
+                $event->rules['mcp/oauth/token'] = 'mcp/oauth/token';
+                $event->rules['mcp/oauth/register'] = 'mcp/oauth/register';
+                $event->rules['mcp/oauth/revoke'] = 'mcp/oauth/revoke';
                 $event->rules['mcp'] = 'mcp/mcp/index';
+            },
+        );
+    }
+
+    /**
+     * Register the plugin's templates dir as a site template root so
+     * the OAuth consent page can be resolved as `craft-mcp/_oauth/authorize`.
+     */
+    private function registerOAuthTemplateRoot(): void {
+        Event::on(
+            View::class,
+            View::EVENT_REGISTER_SITE_TEMPLATE_ROOTS,
+            function (RegisterTemplateRootsEvent $event): void {
+                $event->roots['craft-mcp'] = __DIR__ . '/templates';
             },
         );
     }

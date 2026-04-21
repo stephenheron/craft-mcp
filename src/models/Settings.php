@@ -33,14 +33,33 @@ class Settings extends Model {
     /** @var string[] */
     public array $allowedIps = [];
 
+    public bool $oauthEnabled = false;
+
+    public int $oauthAccessTokenTtl = 3600;
+
+    public int $oauthRefreshTokenTtl = 2592000;
+
+    public int $oauthAuthCodeTtl = 600;
+
+    public bool $oauthAllowDcr = true;
+
+    public bool $oauthRequireConsent = true;
+
+    /** @var string[] */
+    public array $oauthScopesSupported = ['mcp:tools'];
+
+    public ?string $oauthEncryptionKey = null;
+
     /**
      * @return array<int, array<int|string, mixed>>
      */
     #[Override]
     public function defineRules(): array {
         return [
-            [['enabled', 'enableDangerousTools', 'enableHttpTransport'], 'boolean'],
-            [['disabledTools', 'disabledPrompts', 'disabledResources', 'allowedIps'], 'each', 'rule' => ['string']],
+            [['enabled', 'enableDangerousTools', 'enableHttpTransport', 'oauthEnabled', 'oauthAllowDcr', 'oauthRequireConsent'], 'boolean'],
+            [['disabledTools', 'disabledPrompts', 'disabledResources', 'allowedIps', 'oauthScopesSupported'], 'each', 'rule' => ['string']],
+            [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl', 'oauthAuthCodeTtl'], 'integer', 'min' => 1],
+            ['oauthEncryptionKey', 'string'],
         ];
     }
 }
