@@ -43,24 +43,24 @@ class McpServerFactory {
                 version: Mcp::getInstance()?->getVersion() ?? '1.0.0',
             )
             ->setInstructions($this->getInstructions())
-            ->setDiscovery(
-                basePath: dirname(__DIR__),
-                scanDirs: ['tools', 'prompts', 'resources'],
-                excludeDirs: ['vendor', 'support', 'services', 'events', 'models', 'enums', 'attributes', 'completions', 'contracts'],
-            )
             ->setContainer($this->container);
 
-        // Add custom logger if provided (writes to separate file, not Craft logs)
+        // Tools, prompts and resources are registered manually below via the
+        // plugin's own registries so that Mcp::is*Enabled() can gate each one.
+        // setDiscovery() is intentionally not used: it would auto-register every
+        // #[McpTool]/#[McpPrompt]/#[McpResource] it found, bypassing the
+        // enableDangerousTools / disabledTools / disabledPrompts / disabledResources
+        // settings.
+
         if ($this->logger !== null) {
             $builder->setLogger($this->logger);
         }
 
-        // Use file-based session store for HTTP transport persistence
         if ($this->sessionStore !== null) {
             $builder->setSession($this->sessionStore);
         }
 
-        $this->registerExternalElements($builder);
+        $this->registerElements($builder);
 
         return $builder->build();
     }
@@ -114,14 +114,18 @@ This MCP server provides access to a Craft CMS installation.
 INSTRUCTIONS;
     }
 
-    private function registerExternalElements(Builder $builder): void {
-        $this->registerExternalTools($builder);
-        $this->registerExternalPrompts($builder);
-        $this->registerExternalResources($builder);
+    private function registerElements(Builder $builder): void {
+        $this->registerTools($builder);
+        $this->registerPrompts($builder);
+        $this->registerResources($builder);
     }
 
-    private function registerExternalTools(Builder $builder): void {
-        foreach (McpRegistry::tools()->getExternalToolDefinitions() as $def) {
+    private function registerTools(Builder $builder): void {
+        foreach (McpRegistry::tools()->getDefinitions() as $def) {
+            if (!Mcp::isToolEnabled($def->name)) {
+                continue;
+            }
+
             $builder->addTool(
                 handler: [$def->class, $def->method],
                 name: $def->name,
@@ -130,8 +134,12 @@ INSTRUCTIONS;
         }
     }
 
-    private function registerExternalPrompts(Builder $builder): void {
-        foreach (McpRegistry::prompts()->getExternalPromptDefinitions() as $def) {
+    private function registerPrompts(Builder $builder): void {
+        foreach (McpRegistry::prompts()->getDefinitions() as $def) {
+            if (!Mcp::isPromptEnabled($def->name)) {
+                continue;
+            }
+
             $builder->addPrompt(
                 handler: [$def->class, $def->method],
                 name: $def->name,
@@ -140,8 +148,12 @@ INSTRUCTIONS;
         }
     }
 
-    private function registerExternalResources(Builder $builder): void {
-        foreach (McpRegistry::resources()->getExternalResourceDefinitions() as $def) {
+    private function registerResources(Builder $builder): void {
+        foreach (McpRegistry::resources()->getDefinitions() as $def) {
+            if (!Mcp::isResourceEnabled($def->uri)) {
+                continue;
+            }
+
             $this->registerResource($builder, $def);
         }
     }
